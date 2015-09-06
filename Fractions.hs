@@ -940,48 +940,22 @@ mq (M a b c d) (Q e f g h i j) = Q
 -- (m :* n :* ...) implies that all matrices from n onward always narrow a suitable interval.
 -- (m :* ...) = singular matrices m simplify to Q
 
-data F
-  = Quot    {-# UNPACK #-} !(V Z)     -- extended rational
-  | Hom     {-# UNPACK #-} !(M Z) F   -- unapplied linear fractional transformation
-  | Hurwitz {-# UNPACK #-} !(M (P Z)) -- (generalized) hurwitz numbers
-  deriving Show
-
-instance Eq F where
-  (==) = error "TODO"
-
-instance Ord F where
-  compare = error "TODO"
-
-class Hom a where
-  hom :: M Z -> a -> a
-
-instance Hom F where
-  hom m (Quot v) = Quot $ scale $ mv m v
-  hom m (Hom n x) = Hom (scale $ m <> n) x -- check for efficiency
-  hom (fmap lift -> m) (Hurwitz o) | det m /= 0 = hurwitz (m <> o <> inv m)
-  hom m x = Hom (scale m) x -- deferred hom
-
-class Eff a where
-  eff :: F -> a
-
-instance Eff F where
-  eff = id
-
 data E
-  = Eff F
-  | Quad {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
-  | Mero {-# UNPACK #-} !(T Z) {-# UNPACK #-} !(T (P Z)) E -- nested bihomographic transformations
-  | Bihom {-# UNPACK #-} !(T Z) E E                        -- bihomographic transformation
-  deriving Show
+  = Quot    {-# UNPACK #-} !(V Z)                             -- extended rational
+  | Hom     {-# UNPACK #-} !(M Z) E                           -- unapplied linear fractional transformation
+  | Hurwitz {-# UNPACK #-} !(M (P Z))                         -- (generalized) hurwitz numbers
+  | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
+  | Mero    {-# UNPACK #-} !(T Z) {-# UNPACK #-} !(T (P Z)) E -- nested bihomographic transformations
+  | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
 
-instance Eff E where
-  eff = Eff
-
-instance Hom E where
-  hom m (Eff f)       = eff (hom m f)
-  hom m (Quad q x)    = quad (scale $ mq m q) x
-  hom m (Mero s t x)  = mero (scale $ mt m s) t x
-  hom m (Bihom s x y) = bihom (mt m s) x y
+hom :: M Z -> E -> E
+hom m (Quot v) = Quot $ scale $ mv m v
+hom m (Hom n x) = Hom (scale $ m <> n) x -- check for efficiency
+hom m (Quad q x)    = quad (scale $ mq m q) x
+hom m (Mero s t x)  = mero (scale $ mt m s) t x
+hom m (Bihom s x y) = bihom (mt m s) x y
+hom (fmap lift -> m) (Hurwitz o) | det m /= 0 = hurwitz (m <> o <> inv m)
+--hom m x = Hom (scale m) x -- deferred hom
 
 -- | apply a meromorphic function
 --
@@ -998,18 +972,18 @@ instance Hom E where
 -- @
 mero :: T Z -> T (P Z) -> E -> E
 -- TODO: simplify if the matrix has no x component? y component?
-mero s t (Eff (Quot r)) = hom (tv1 s r) (hurwitz (tv1 t (fmap lift r)))
+mero s t (Quot r) = hom (tv1 s r) (hurwitz (tv1 t (fmap lift r)))
 mero s t x = Mero (scale s) (scaleP t) x
 
 -- | apply a bihomographic transformation
 bihom :: T Z -> E -> E -> E
-bihom m (Eff (Quot r)) y = hom (tv1 m r) y
-bihom m x (Eff (Quot r)) = hom (tv2 m r) x
+bihom m (Quot r) y = hom (tv1 m r) y
+bihom m x (Quot r) = hom (tv2 m r) x
 bihom m x y = Bihom (scale m) x y
 {-# NOINLINE bihom #-}
 
 quad :: Q Z -> E -> E
-quad q (Eff (Quot v)) = Eff (Quot (qv q v))
+quad q (Quot v) = Quot (qv q v)
 quad (Q 0 a b 0 c d) x = hom (M a b c d) x
 quad (Q a b c d e f) x
   | a*e == b*d, a*f == d*c, b*f == c*e, False = undefined
@@ -1018,28 +992,28 @@ quad (Q a b c d e f) x
 quad q x = Quad q x
 
 -- smart constructor
-hurwitz :: Eff f => M (P Z) -> f
+hurwitz :: M (P Z) -> E
 -- hurwitz (fmap at0 -> M a b c d) | a*d == c*b = Quot (V a c) -- singular: TODO: check this
-hurwitz m = eff $ Hurwitz (scaleP m)
+hurwitz m = Hurwitz (scaleP m)
 
--- extract a partial quotient
-nextF :: F -> Maybe (Z, F)
-nextF (Quot (V k n)) = case quotRem k n of
-  (q, r) -> Just (q, Quot (V n r))
-nextF (Hom (M a b 0 0) xs) = Nothing -- ∞ or ⊥
-nextF (Hom m@(M a b c d) xs)
-  | c /= 0, d /= 0
-  , signum c * signum (c + d) > 0 -- knuth style warmup?
-  , q <- quot a c
-  , q == quot b d
-  , n <- cfdigit q = Just (q, Hom (inv n <> m) xs)
-nextF (Hom m xs) = nextF (hom m xs) -- fetch more
-nextF (Hurwitz m) = nextF (Hom (fmap at0 m) $ Hurwitz (fmap (<> P [1,1]) m)) -- explicitly used Hom to keep it from merging back
+-- -- extract a partial quotient
+-- nextF :: F -> Maybe (Z, F)
+-- nextF (Quot (V k n)) = case quotRem k n of
+--   (q, r) -> Just (q, Quot (V n r))
+-- nextF (Hom (M a b 0 0) xs) = Nothing -- ∞ or ⊥
+-- nextF (Hom m@(M a b c d) xs)
+--   | c /= 0, d /= 0
+--   , signum c * signum (c + d) > 0 -- knuth style warmup?
+--   , q <- quot a c
+--   , q == quot b d
+--   , n <- cfdigit q = Just (q, Hom (inv n <> m) xs)
+-- nextF (Hom m xs) = nextF (hom m xs) -- fetch more
+-- nextF (Hurwitz m) = nextF (Hom (fmap at0 m) $ Hurwitz (fmap (<> P [1,1]) m)) -- explicitly used Hom to keep it from merging back
 
-square :: E -> E
-square x = quad (Q 1 0 0 0 0 1) x
+-- square :: E -> E
+-- square x = quad (Q 1 0 0 0 0 1) x
 
-{-# RULES "bihomographic to quadratic" forall t x. bihom t x x = quad (tq t) x #-}
+-- {-# RULES "bihomographic to quadratic" forall t x. bihom t x x = quad (tq t) x #-}
 
 instance Eq E
 instance Ord E
@@ -1058,17 +1032,17 @@ instance Num E where
   abs xs | xs < 0 = negate xs
          | otherwise = xs
   signum xs = fromInteger $ case compare xs 0 of LT -> -1; EQ -> 0; GT -> 1
-  fromInteger n = Eff $ Quot $ V n 1
+  fromInteger n = Quot $ V n 1
 
 instance Fractional E where
   -- x / x -> quad (Q 0 1 0 0 1 0) x = hom (1 0 1 0) x = 1 for nice x
   x / y = bihom (T 0 1 0 0 0 0 1 0) x y
   {-# INLINE (/) #-}
   recip x = hom (M 0 1 1 0) x
-  fromRational (k :% n) = Eff $ Quot $ V k n
+  fromRational (k :% n) = Quot $ V k n
 
 instance Floating E where
-  pi     = Eff $ M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
+  pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
   exp    = mero (T 1 1 2 0 (-1) 1 2 0) (T 0 1 (P [6,4]) 0 1 0 0 0)
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
@@ -1078,8 +1052,8 @@ instance Floating E where
 
 instance IntegralDomain E
 
-sqrt2 :: Eff f => f
-sqrt2 = eff $ cfdigit 1 `hom` hurwitz (M 2 1 1 0)
+sqrt2 :: E
+sqrt2 = cfdigit 1 `hom` hurwitz (M 2 1 1 0)
 
 --------------------------------------------------------------------------------
 -- * Continued Fractions
