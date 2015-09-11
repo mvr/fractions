@@ -945,17 +945,17 @@ data E
   | Hom     {-# UNPACK #-} !(M Z) E                           -- unapplied linear fractional transformation
   | Hurwitz {-# UNPACK #-} !(M (P Z))                         -- (generalized) hurwitz numbers
   | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
-  | Mero    {-# UNPACK #-} !(T Z) {-# UNPACK #-} !(T (P Z)) E -- nested bihomographic transformations
+  | Mero    {-# UNPACK #-} !(T (P Z)) E                       -- nested bihomographic transformations
   | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
 
 hom :: M Z -> E -> E
 hom m (Quot v) = Quot $ scale $ mv m v
 hom m (Hom n x) = Hom (scale $ m <> n) x -- check for efficiency
-hom m (Quad q x)    = quad (scale $ mq m q) x
-hom m (Mero s t x)  = mero (scale $ mt m s) t x
+hom m (Quad q x) = quad (scale $ mq m q) x
+--hom m (Mero t x) = Hom m $ Mero t x
 hom m (Bihom s x y) = bihom (mt m s) x y
-hom (fmap lift -> m) (Hurwitz o) | det m /= 0 = hurwitz (m <> o <> inv m)
---hom m x = Hom (scale m) x -- deferred hom
+--hom (fmap lift -> m) (Hurwitz o) | det m /= 0 = hurwitz (m <> o <> inv m)
+hom m x = Hom (scale m) x -- deferred hom
 
 -- | apply a meromorphic function
 --
@@ -970,10 +970,10 @@ hom (fmap lift -> m) (Hurwitz o) | det m /= 0 = hurwitz (m <> o <> inv m)
 --      x   .
 --           .
 -- @
-mero :: T Z -> T (P Z) -> E -> E
+mero :: T (P Z) -> E -> E
 -- TODO: simplify if the matrix has no x component? y component?
-mero s t (Quot r) = hom (tv1 s r) (hurwitz (tv1 t (fmap lift r)))
-mero s t x = Mero (scale s) (scaleP t) x
+mero t (Quot r) = hurwitz (tv1 t (fmap lift r))
+mero t x = Mero (scaleP t) x
 
 -- | apply a bihomographic transformation
 bihom :: T Z -> E -> E -> E
@@ -1043,7 +1043,7 @@ instance Fractional E where
 
 instance Floating E where
   pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
-  exp    = mero (T 1 1 2 0 (-1) 1 2 0) (T 0 1 (P [6,4]) 0 1 0 0 0)
+  exp x  = bihom (T 1 1 2 0 (-1) 1 2 0) x $ mero (T 0 1 (P [6,4]) 0 1 0 0 0) x
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
   sinh x = quad (Q 1 0 (-1) 0 2 0) (exp x)
