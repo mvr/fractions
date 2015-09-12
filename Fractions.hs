@@ -1141,6 +1141,7 @@ emit (Quot v) = (Term v, error "emit after Term")
 emit (Hom h@(M a b c d) e)
   | c /= 0, d /= 0,
     q <- a `quot` c,
+    q /= 0,
     q == b `quot` d
   = (CFDigit q, hom (inv (cfdigit q) <> h) e)
   | h' <- inv dpos <> h, posM h' = (BinaryDigit Dpos, hom h' e)
@@ -1151,6 +1152,7 @@ emit (Hom h e) = emit $ pump (hom h e)
 emit (Bihom t@(T a b c d e f g h) x y)
   | e /= 0, f /= 0, g /= 0, h /= 0,
     q <- a `quot` e,
+    q /= 0,
     q == b `quot` f,
     q == c `quot` g,
     q == d `quot` h
