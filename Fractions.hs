@@ -955,9 +955,9 @@ posQ q@(Q a _ _ d _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == f
 data E
   = Quot    {-# UNPACK #-} !(V Z)                             -- extended rational
   | Hom     {-# UNPACK #-} !(M Z) E                           -- unapplied linear fractional transformation
-  | Hurwitz {-# UNPACK #-} !Integer !(M (P Z))                         -- (generalized) hurwitz numbers
+  | Hurwitz {-# UNPACK #-} !Integer !(M (P Z))                -- (generalized) hurwitz numbers
   | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
-  | Mero    {-# UNPACK #-} !(T (P Z)) E                       -- nested bihomographic transformations
+  | Mero    {-# UNPACK #-} !Integer !(T (P Z)) E              -- nested bihomographic transformations
   | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
     deriving (Show)
 
@@ -1023,8 +1023,8 @@ hurwitz m = Hurwitz 0 (scaleP m)
 -- nextF (Hom m xs) = nextF (hom m xs) -- fetch more
 -- nextF (Hurwitz m) = nextF (Hom (fmap at0 m) $ Hurwitz (fmap (<> P [1,1]) m)) -- explicitly used Hom to keep it from merging back
 
--- square :: E -> E
--- square x = quad (Q 1 0 0 0 0 1) x
+square :: E -> E
+square x = quad (Q 1 0 0 0 0 1) x
 
 -- {-# RULES "bihomographic to quadratic" forall t x. bihom t x x = quad (tq t) x #-}
 
@@ -1056,7 +1056,10 @@ instance Fractional E where
 
 instance Floating E where
   pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
-  exp x  = bihom (T 1 1 2 0 (-1) 1 2 0) x $ mero (T 0 1 (P [6,4]) 0 1 0 0 0) x
+  exp x  = case sign x of
+    (Szer, x') -> mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
+                          (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) x'
+    _          -> square $ exp (x / 2)
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
   sinh x = quad (Q 1 0 (-1) 0 2 0) (exp x)
