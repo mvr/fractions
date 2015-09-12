@@ -332,7 +332,9 @@ instance Columns V where
 sigma :: V Z -> Z
 sigma (V a b) = case compare a 0 of
   LT | b <= 0 -> -1
+     | otherwise -> 0
   GT | b >= 0 -> 1
+     | otherwise -> 0
   _           -> signum b
 
 -- | Is V ∈ V⁺ ?
