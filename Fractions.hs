@@ -950,7 +950,7 @@ mq (M a b c d) (Q e f g h i j) = Q
 data E
   = Quot    {-# UNPACK #-} !(V Z)                             -- extended rational
   | Hom     {-# UNPACK #-} !(M Z) E                           -- unapplied linear fractional transformation
-  | Hurwitz {-# UNPACK #-} !(M (P Z))                         -- (generalized) hurwitz numbers
+  | Hurwitz {-# UNPACK #-} !Integer !(M (P Z))                         -- (generalized) hurwitz numbers
   | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
   | Mero    {-# UNPACK #-} !(T (P Z)) E                       -- nested bihomographic transformations
   | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
@@ -1002,7 +1002,7 @@ quad q x = Quad q x
 -- smart constructor
 hurwitz :: M (P Z) -> E
 -- hurwitz (fmap at0 -> M a b c d) | a*d == c*b = Quot (V a c) -- singular: TODO: check this
-hurwitz m = Hurwitz (scaleP m)
+hurwitz m = Hurwitz 0 (scaleP m)
 
 -- -- extract a partial quotient
 -- nextF :: F -> Maybe (Z, F)
@@ -1132,12 +1132,12 @@ sign (Bihom s x y) | posT s'                         = (Spos, bihom s' x' y')
   where (sx, x') = sign x
         (sy, y') = sign y
         s' = tm2 (tm1 s (signm sx)) (signm sy)
+sign (Hurwitz n m) = (Spos, Hurwitz n m)
 --sign (Quad q e) =
---sign (Hurwitz m) = (Spos, Hurwitz m)
 --sign (Mero t e) = (Spos, Mero t e)
 
 emit :: E -> (Info, E)
-emit (Quot v) = (Term v, undefined)
+emit (Quot v) = (Term v, error "emit after Term")
 emit (Hom h@(M a b c d) e)
   | c /= 0, d /= 0,
     q <- a `quot` c,
@@ -1158,12 +1158,12 @@ emit (Bihom t@(T a b c d e f g h) x y)
   | t' <- inv dneg `mt` t, posT t' = (BinaryDigit Dneg, bihom t' x y)
   | t' <- inv dzer `mt` t, posT t' = (BinaryDigit Dzer, bihom t' x y)
 emit (Bihom t x y) = emit $ pump (bihom t x y)
+emit (Hurwitz n m) = (AnyHom $ fmap (at n) m, Hurwitz (n+1) m)
 --emit (Quad q e) =
---emit (Hurwitz m) =
 --emit (Mero t e) =
 
 pump :: E -> E
-pump (Quot v) = undefined
+pump (Quot _) = error "pump Quot"
 pump (Hom h e) | (i, e') <- emit e = case i of
                  Term v -> hom h (Quot v)
                  _      -> hom (h <> infom i) e'
@@ -1174,6 +1174,7 @@ pump (Bihom t x y) | (ix, x') <- emit x,
                      (Term v, _) -> bihom t (Quot v) y
                      (_, Term v) -> bihom t x (Quot v)
                      (_, _) -> bihom (t `tm1` infom ix `tm2` infom iy ) x' y'
+pump (Hurwitz _ _) = error "pump Hurwitz"
 
 --------------------------------------------------------------------------------
 -- * Decimal
