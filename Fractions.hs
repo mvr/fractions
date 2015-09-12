@@ -1149,7 +1149,8 @@ emit (Hom h@(M a b c d) e)
 emit (Hom h e) = emit $ pump (hom h e)
 
 emit (Bihom t@(T a b c d e f g h) x y)
-  | q <- a `quot` e,
+  | e /= 0, f /= 0, g /= 0, h /= 0,
+    q <- a `quot` e,
     q == b `quot` f,
     q == c `quot` g,
     q == d `quot` h
