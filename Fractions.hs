@@ -840,6 +840,11 @@ approx (T a b c d e f g h)
   , V n p <- max j l
   = M m n o p
 
+-- | is e ∈ T⁺ ?
+posT :: T Z -> Bool
+posT t@(T a b _ _ _ _ _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) t)
+  where first = sigma (V a b)
+
 --------------------------------------------------------------------------------
 -- * Binary Quadratic Forms?
 --------------------------------------------------------------------------------
@@ -972,7 +977,7 @@ hom m x = Hom (scale m) x -- deferred hom
 -- @
 mero :: T (P Z) -> E -> E
 -- TODO: simplify if the matrix has no x component? y component?
-mero t (Quot r) = hurwitz (tv1 t (fmap lift r))
+mero t (Quot r) = hurwitz (tv1 t (fmap lift r)) -- TODO: This is broken when r is negative
 mero t x = Mero (scaleP t) x
 
 -- | apply a bihomographic transformation
@@ -1070,6 +1075,104 @@ gcfdigit a b = M a b 1 0
 --------------------------------------------------------------------------------
 -- * Redundant Binary Representation
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- * Information Extraction
+--------------------------------------------------------------------------------
+
+data SignM = Sinf | Sneg | Szer | Spos deriving (Show)
+
+signm :: Num a => SignM -> M a
+signm Sinf = sinf
+signm Sneg = sneg
+signm Szer = szer
+signm Spos = mempty
+
+data DigitM = Dneg | Dzer | Dpos deriving (Show)
+
+dneg :: Num a => M a
+dneg = M 1 1 0 2
+
+dzer :: Num a => M a
+dzer = M 3 1 1 3
+
+dpos :: Num a => M a
+dpos = M 2 0 1 1
+
+digitm :: Num a => DigitM -> M a
+digitm Dneg = dneg
+digitm Dzer = dzer
+digitm Dpos = dpos
+
+data Info = CFDigit Z | BinaryDigit DigitM | Term (V Z) deriving (Show)
+
+sign :: E -> (SignM, E)
+sign (Quot v) | posV v                         = (Spos, Quot v)
+              | otherwise                      = (Sneg, Quot (mv (inv sneg) v))
+sign (Hom h e) | posM h'                       = (Spos, hom h' e')
+               | uh <- inv sinf <> h', posM uh = (Sinf, hom uh e')
+               | uh <- inv sneg <> h', posM uh = (Sneg, hom uh e')
+               | uh <- inv szer <> h', posM uh = (Szer, hom uh e')
+               | otherwise                     = sign (pump (hom h' e'))
+  where (s, e') = sign e
+        h' = h <> signm s
+sign (Bihom s x y) | posT s'                         = (Spos, bihom s' x' y')
+                   | us <- inv sinf `mt` s', posT us = (Sinf, bihom s' x' y')
+                   | us <- inv sneg `mt` s', posT us = (Sneg, bihom s' x' y')
+                   | us <- inv szer `mt` s', posT us = (Szer, bihom s' x' y')
+                   | otherwise                       = sign (pump (bihom s' x' y'))
+  where (sx, x') = sign x
+        (sy, y') = sign y
+        s' = tm2 (tm1 s (signm sx)) (signm sy)
+--sign (Quad q e) =
+--sign (Hurwitz m) = (Spos, Hurwitz m)
+--sign (Mero t e) = (Spos, Mero t e)
+
+emit :: E -> (Info, E)
+emit (Quot v) = (Term v, undefined)
+emit (Hom h@(M a b c d) e)
+  | c /= 0, d /= 0,
+    q <- a `quot` c,
+    q == b `quot` d
+  = (CFDigit q, hom (inv (cfdigit q) <> h) e)
+  | h' <- inv dpos <> h, posM h' = (BinaryDigit Dpos, hom h' e)
+  | h' <- inv dneg <> h, posM h' = (BinaryDigit Dneg, hom h' e)
+  | h' <- inv dzer <> h, posM h' = (BinaryDigit Dzer, hom h' e)
+emit (Hom h e) = emit $ pump (hom h e)
+
+emit (Bihom t@(T a b c d e f g h) x y)
+  | q <- a `quot` e,
+    q == b `quot` f,
+    q == c `quot` g,
+    q == d `quot` h
+  = (CFDigit q, Bihom (inv (cfdigit q) `mt` t) x y)
+  | t' <- inv dpos `mt` t, posT t' = (BinaryDigit Dpos, bihom t' x y)
+  | t' <- inv dneg `mt` t, posT t' = (BinaryDigit Dneg, bihom t' x y)
+  | t' <- inv dzer `mt` t, posT t' = (BinaryDigit Dzer, bihom t' x y)
+emit (Bihom t x y) = emit $ pump (bihom t x y)
+--emit (Quad q e) =
+--emit (Hurwitz m) =
+--emit (Mero t e) =
+
+pump :: E -> E
+pump (Quot v) = undefined
+pump (Hom h e) | (i, e') <- emit e = case i of
+                 CFDigit q -> hom (h <> cfdigit q) e'
+                 BinaryDigit b -> hom (h <> digitm b) e'
+                 Term v -> hom h (Quot v)
+-- TODO: need to use a 'strategy' here
+pump (Bihom t x y) | (ix, x') <- emit x,
+                     (iy, y') <- emit y
+                   = case ix of
+                     Term v1 -> bihom t (Quot v1) y
+                     CFDigit q1 -> case iy of
+                       Term v2 -> bihom t x (Quot v2)
+                       CFDigit q2 -> bihom (t `tm1` cfdigit q1 `tm2` cfdigit q2 ) x' y'
+                       BinaryDigit b2 -> bihom (t `tm1` cfdigit q1 `tm2` digitm b2 ) x' y'
+                     BinaryDigit b1 -> case iy of
+                       Term v2 -> bihom t x (Quot v2)
+                       CFDigit q2 -> bihom (t `tm1` digitm b1 `tm2` cfdigit q2 ) x' y'
+                       BinaryDigit b2 -> bihom (t `tm1` digitm b1 `tm2` digitm b2 ) x' y'
 
 --------------------------------------------------------------------------------
 -- * Decimal
