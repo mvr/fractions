@@ -938,6 +938,11 @@ mq (M a b c d) (Q e f g h i j) = Q
   (a*e+b*h) (a*f+b*i) (a*g+b*j)
   (c*e+d*h) (c*f+d*i) (c*g+d*j)
 
+-- | is q ∈ Q⁺ ?
+posQ :: Q Z -> Bool
+posQ q@(Q a _ _ d _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) q)
+  where first = sigma (V a d)
+
 --------------------------------------------------------------------------------
 -- * Exact Real Arithmetic
 --------------------------------------------------------------------------------
@@ -1132,8 +1137,14 @@ sign (Bihom s x y) | posT s'                         = (Spos, bihom s' x' y')
   where (sx, x') = sign x
         (sy, y') = sign y
         s' = tm2 (tm1 s (signm sx)) (signm sy)
+sign (Quad q e) | posQ q'                       = (Spos, quad q' e')
+                | uq <- inv sinf `mq` q', posQ uq = (Sinf, quad uq e')
+                | uq <- inv sneg `mq` q', posQ uq = (Sneg, quad uq e')
+                | uq <- inv szer `mq` q', posQ uq = (Szer, quad uq e')
+               | otherwise                     = sign (pump (quad q' e'))
+  where (s, e') = sign e
+        q' = q `qm` signm s
 sign (Hurwitz n m) = (Spos, Hurwitz n m)
---sign (Quad q e) =
 --sign (Mero t e) = (Spos, Mero t e)
 
 emit :: E -> (Info, E)
@@ -1161,6 +1172,19 @@ emit (Bihom t@(T a b c d e f g h) x y)
   | t' <- inv dneg `mt` t, posT t' = (BinaryDigit Dneg, bihom t' x y)
   | t' <- inv dzer `mt` t, posT t' = (BinaryDigit Dzer, bihom t' x y)
 emit (Bihom t x y) = emit $ pump (bihom t x y)
+
+emit (Quad r@(Q a b c d e f) x)
+  | c /= 0, d /= 0,
+    q <- a `quot` d,
+    q /= 0,
+    q == b `quot` e,
+    q == c `quot` f
+  = (CFDigit q, quad (inv (cfdigit q) `mq` r) x)
+  | r' <- inv dpos `mq` r, posQ r' = (BinaryDigit Dpos, quad r' x)
+  | r' <- inv dneg `mq` r, posQ r' = (BinaryDigit Dneg, quad r' x)
+  | r' <- inv dzer `mq` r, posQ r' = (BinaryDigit Dzer, quad r' x)
+emit (Quad r x) = emit $ pump (quad r x)
+
 emit (Hurwitz n m) = (AnyHom $ fmap (at n) m, Hurwitz (n+1) m)
 --emit (Quad q e) =
 --emit (Mero t e) =
@@ -1177,6 +1201,10 @@ pump (Bihom t x y) | (ix, x') <- emit x,
                      (Term v, _) -> bihom t (Quot v) y
                      (_, Term v) -> bihom t x (Quot v)
                      (_, _) -> bihom (t `tm1` infom ix `tm2` infom iy ) x' y'
+pump (Quad q x) | (i, e') <- emit x = case i of
+                  Term v -> quad q (Quot v)
+                  _      -> quad (q `qm` infom i) e'
+
 pump (Hurwitz _ _) = error "pump Hurwitz"
 
 --------------------------------------------------------------------------------
