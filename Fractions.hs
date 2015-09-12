@@ -844,8 +844,8 @@ approx (T a b c d e f g h)
 
 -- | is e ∈ T⁺ ?
 posT :: T Z -> Bool
-posT t@(T a b _ _ _ _ _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) t)
-  where first = sigma (V a b)
+posT t@(T a _ _ _ e _ _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) t)
+  where first = sigma (V a e)
 
 --------------------------------------------------------------------------------
 -- * Binary Quadratic Forms?
