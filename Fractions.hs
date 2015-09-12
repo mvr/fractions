@@ -1216,6 +1216,12 @@ result e = Result s (results ue)
           (Term v, _) -> [Term v]
           (i, next) -> i : results next
 
+approximate :: Integer -> Result -> V Z
+approximate n (Result sign is) = signm sign `mv` unsigned n is
+  where unsigned _ [Term v] = v
+        unsigned 0 (i:is) | M a _ c _ <- infom i = V a c -- why not
+        unsigned n (i:is) = infom i `mv` unsigned (n-1) is
+
 --------------------------------------------------------------------------------
 -- * Decimal
 --------------------------------------------------------------------------------
