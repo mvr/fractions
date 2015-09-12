@@ -319,9 +319,9 @@ scale10 xs
 -- * Intervals
 --------------------------------------------------------------------------------
 
-data I
-  = U               -- the entire universe R∞
-  | I {-# UNPACK #-} !(V Z) {-# UNPACK #-} !(V Z) -- a closed interval
+-- data I
+--   = U               -- the entire universe R∞
+--   | I {-# UNPACK #-} !(V Z) {-# UNPACK #-} !(V Z) -- a closed interval
 
 class Columns f where
   columns :: Semigroup m => (V a -> m) -> f a -> m
@@ -952,6 +952,7 @@ data E
   | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
   | Mero    {-# UNPACK #-} !(T (P Z)) E                       -- nested bihomographic transformations
   | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
+    deriving (Show)
 
 hom :: M Z -> E -> E
 hom m (Quot v) = Quot $ scale $ mv m v
@@ -1104,7 +1105,12 @@ digitm Dneg = dneg
 digitm Dzer = dzer
 digitm Dpos = dpos
 
-data Info = CFDigit Z | BinaryDigit DigitM | Term (V Z) deriving (Show)
+data Info = CFDigit Z | BinaryDigit DigitM | AnyHom (M Z) | Term (V Z)
+
+infom :: Info -> M Z
+infom (CFDigit q) = cfdigit q
+infom (BinaryDigit b) = digitm b
+infom (AnyHom h) = h
 
 sign :: E -> (SignM, E)
 sign (Quot v) | posV v                         = (Spos, Quot v)
@@ -1157,22 +1163,15 @@ emit (Bihom t x y) = emit $ pump (bihom t x y)
 pump :: E -> E
 pump (Quot v) = undefined
 pump (Hom h e) | (i, e') <- emit e = case i of
-                 CFDigit q -> hom (h <> cfdigit q) e'
-                 BinaryDigit b -> hom (h <> digitm b) e'
                  Term v -> hom h (Quot v)
+                 _      -> hom (h <> infom i) e'
 -- TODO: need to use a 'strategy' here
 pump (Bihom t x y) | (ix, x') <- emit x,
                      (iy, y') <- emit y
-                   = case ix of
-                     Term v1 -> bihom t (Quot v1) y
-                     CFDigit q1 -> case iy of
-                       Term v2 -> bihom t x (Quot v2)
-                       CFDigit q2 -> bihom (t `tm1` cfdigit q1 `tm2` cfdigit q2 ) x' y'
-                       BinaryDigit b2 -> bihom (t `tm1` cfdigit q1 `tm2` digitm b2 ) x' y'
-                     BinaryDigit b1 -> case iy of
-                       Term v2 -> bihom t x (Quot v2)
-                       CFDigit q2 -> bihom (t `tm1` digitm b1 `tm2` cfdigit q2 ) x' y'
-                       BinaryDigit b2 -> bihom (t `tm1` digitm b1 `tm2` digitm b2 ) x' y'
+                   = case (ix, iy) of
+                     (Term v, _) -> bihom t (Quot v) y
+                     (_, Term v) -> bihom t x (Quot v)
+                     (_, _) -> bihom (t `tm1` infom ix `tm2` infom iy ) x' y'
 
 --------------------------------------------------------------------------------
 -- * Decimal
