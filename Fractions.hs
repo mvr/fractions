@@ -1149,7 +1149,21 @@ sign (Quad q e) | uq <- inv szer `mq` q', posQ uq = (Szer, quad uq e')
   where (s, e') = sign e
         q' = q `qm` signm s
 sign (Hurwitz n m) = (Spos, Hurwitz n m)
---sign (Mero t e) = (Spos, Mero t e)
+sign (Mero n t e) = (Spos, Mero n t e)
+
+emitT :: T Z -> Maybe (Info, T Z)
+emitT t@(T a b c d e f g h)
+  | e /= 0, f /= 0, g /= 0, h /= 0,
+    q <- a `quot` e,
+    q /= 0,
+    q == b `quot` f,
+    q == c `quot` g,
+    q == d `quot` h
+  = Just (CFDigit q, inv (cfdigit q) `mt` t)
+  | t' <- inv dpos `mt` t, posT t' = Just (BinaryDigit Dpos, t')
+  | t' <- inv dneg `mt` t, posT t' = Just (BinaryDigit Dneg, t')
+  | t' <- inv dzer `mt` t, posT t' = Just (BinaryDigit Dzer, t')
+  | otherwise                      = Nothing
 
 emit :: E -> (Info, E)
 emit (Quot v) = (Term v, error "emit after Term")
@@ -1163,20 +1177,9 @@ emit (Hom h@(M a b c d) e)
   | h' <- inv dneg <> h, posM h' = (BinaryDigit Dneg, hom h' e)
   | h' <- inv dzer <> h, posM h' = (BinaryDigit Dzer, hom h' e)
 emit (Hom h e) = emit $ pump (hom h e)
-
-emit (Bihom t@(T a b c d e f g h) x y)
-  | e /= 0, f /= 0, g /= 0, h /= 0,
-    q <- a `quot` e,
-    q /= 0,
-    q == b `quot` f,
-    q == c `quot` g,
-    q == d `quot` h
-  = (CFDigit q, Bihom (inv (cfdigit q) `mt` t) x y)
-  | t' <- inv dpos `mt` t, posT t' = (BinaryDigit Dpos, bihom t' x y)
-  | t' <- inv dneg `mt` t, posT t' = (BinaryDigit Dneg, bihom t' x y)
-  | t' <- inv dzer `mt` t, posT t' = (BinaryDigit Dzer, bihom t' x y)
-emit (Bihom t x y) = emit $ pump (bihom t x y)
-
+emit (Bihom t x y) = case emitT t of
+  Just (i, t') -> (i, bihom t' x y)
+  Nothing      -> emit $ pump (bihom t x y)
 emit (Quad r@(Q a b c d e f) x)
   | d /= 0, e /= 0, f /= 0,
     q <- a `quot` d,
@@ -1188,10 +1191,11 @@ emit (Quad r@(Q a b c d e f) x)
   | r' <- inv dneg `mq` r, posQ r' = (BinaryDigit Dneg, quad r' x)
   | r' <- inv dzer `mq` r, posQ r' = (BinaryDigit Dzer, quad r' x)
 emit (Quad r x) = emit $ pump (quad r x)
-
 emit (Hurwitz n m) = (AnyHom $ fmap (at n) m, Hurwitz (n+1) m)
---emit (Quad q e) =
---emit (Mero t e) =
+emit (Mero n t e) = case emitT $ fmap (at n) t of
+  Just (i, _) -> let im = fmap lift $ infom i in
+                 (i, mero (inv im `mt` t `tm2` im) e)
+  Nothing     -> emit $ pump (Mero n t e)
 
 pump :: E -> E
 pump (Quot _) = error "pump Quot"
@@ -1208,8 +1212,14 @@ pump (Bihom t x y) | (ix, x') <- emit x,
 pump (Quad q x) | (i, e') <- emit x = case i of
                   Term v -> quad q (Quot v)
                   _      -> quad (q `qm` infom i) e'
-
 pump (Hurwitz _ _) = error "pump Hurwitz"
+-- TODO: need to use a 'strategy' here too
+pump (Mero n t e) = popMero kerchunked
+  where (i, e') = emit e
+        kerchunked = case i of
+          Term v -> Hurwitz n (t `tv1` fmap lift v)
+          _      -> Mero n (t `tm1` fmap lift (infom i)) e'
+        popMero (Mero n t e) = bihom (fmap (at n) t) e (Mero (n+1) t e)
 
 data Result = Result SignM [Info] deriving (Show)
 
