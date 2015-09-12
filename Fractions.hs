@@ -1207,6 +1207,15 @@ pump (Quad q x) | (i, e') <- emit x = case i of
 
 pump (Hurwitz _ _) = error "pump Hurwitz"
 
+data Result = Result SignM [Info] deriving (Show)
+
+result :: E -> Result
+result e = Result s (results ue)
+  where (s, ue) = sign e
+        results e = case emit e of
+          (Term v, _) -> [Term v]
+          (i, next) -> i : results next
+
 --------------------------------------------------------------------------------
 -- * Decimal
 --------------------------------------------------------------------------------
