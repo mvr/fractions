@@ -1059,7 +1059,8 @@ instance Floating E where
   exp x  = case sign x of
     (Szer, x') -> mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
                           (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) x'
-    _          -> square $ exp (x / 2)
+    (s,    x') -> let x'' = signm s `hom` x' in
+                  square $ exp (x'' / 2)
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
   sinh x = quad (Q 1 0 (-1) 0 2 0) (exp x)
