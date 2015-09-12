@@ -986,7 +986,7 @@ hom m x = Hom (scale m) x -- deferred hom
 mero :: T (P Z) -> E -> E
 -- TODO: simplify if the matrix has no x component? y component?
 mero t (Quot r) = hurwitz (tv1 t (fmap lift r)) -- TODO: This is broken when r is negative
-mero t x = Mero (scaleP t) x
+mero t x = Mero 0 (scaleP t) x
 
 -- | apply a bihomographic transformation
 bihom :: T Z -> E -> E -> E
