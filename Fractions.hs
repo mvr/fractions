@@ -1177,7 +1177,7 @@ emit (Bihom t@(T a b c d e f g h) x y)
 emit (Bihom t x y) = emit $ pump (bihom t x y)
 
 emit (Quad r@(Q a b c d e f) x)
-  | c /= 0, d /= 0,
+  | d /= 0, e /= 0, f /= 0,
     q <- a `quot` d,
     q /= 0,
     q == b `quot` e,
