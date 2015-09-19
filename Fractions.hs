@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
@@ -1117,35 +1118,93 @@ digitm Dzer = dzer
 digitm Dpos = dpos
 
 data Info = CFDigit Z | BinaryDigit DigitM | AnyHom (M Z) | Term (V Z)
+  deriving (Show)
 
 infom :: Info -> M Z
 infom (CFDigit q) = cfdigit q
 infom (BinaryDigit b) = digitm b
 infom (AnyHom h) = h
 
+class Emissive a where
+  -- Precompose an (M Z)
+  (#>) :: M Z -> a -> a
+
+  contractive :: a -> Bool
+  quotient    :: a -> Maybe (Z, a)
+
+instance Emissive (V Z) where
+  (#>) = mv
+  contractive = posV
+
+instance Emissive (M Z) where
+  (#>) = (<>)
+  contractive = posM
+  quotient h@(M a b c d)
+    | c /= 0, d /= 0,
+      q <- a `quot` c,
+      q /= 0,
+      q == b `quot` d
+    = Just (q, inv (cfdigit q) <> h)
+    | otherwise = Nothing
+
+instance Emissive (T Z) where
+  (#>) = mt
+  contractive = posT
+  quotient t@(T a b c d e f g h)
+    | e /= 0, f /= 0, g /= 0, h /= 0,
+      q <- a `quot` e,
+      q /= 0,
+      q == b `quot` f,
+      q == c `quot` g,
+      q == d `quot` h
+    = Just (q, inv (cfdigit q) `mt` t)
+    | otherwise = Nothing
+
+instance Emissive (Q Z) where
+  (#>) = mq
+  contractive = posQ
+  quotient r@(Q a b c d e f)
+    | d /= 0, e /= 0, f /= 0,
+      q <- a `quot` d,
+      q /= 0,
+      q == b `quot` e,
+      q == c `quot` f
+    = Just (q, inv (cfdigit q) `mq` r)
+    | otherwise = Nothing
+
+attempt :: (Emissive a) => M Z -> a -> Maybe a
+attempt m e = let e' = inv m #> e in
+              if contractive e' then Just e' else Nothing
+
+topsign :: (Emissive a) => a -> Maybe (SignM, a)
+topsign e | Just e' <- attempt szer e = Just (Szer, e')
+topsign e | Just e' <- attempt mempty e = Just (Spos, e')
+topsign e | Just e' <- attempt sinf e = Just (Sinf, e')
+topsign e | Just e' <- attempt sneg e = Just (Sneg, e')
+topsign _ | otherwise = Nothing
+
+topinfo :: (Emissive a) => a -> Maybe (Info, a)
+topinfo e | Just (q, e') <- quotient e     = Just (CFDigit q, e')
+topinfo e | Just e'      <- attempt dpos e = Just (BinaryDigit Dpos, e')
+topinfo e | Just e'      <- attempt dneg e = Just (BinaryDigit Dneg, e')
+topinfo e | Just e'      <- attempt dzer e = Just (BinaryDigit Dzer, e')
+topinfo _ | otherwise                      = Nothing
+
+
 sign :: E -> (SignM, E)
-sign (Quot v) | posV v                         = (Spos, Quot v)
-              | otherwise                      = (Sneg, Quot (mv (inv sneg) v))
-sign (Hom h e) | uh <- inv szer <> h', posM uh = (Szer, hom uh e')
-               | posM h'                       = (Spos, hom h' e')
-               | uh <- inv sinf <> h', posM uh = (Sinf, hom uh e')
-               | uh <- inv sneg <> h', posM uh = (Sneg, hom uh e')
-               | otherwise                     = sign (pump (hom h' e'))
-  where (s, e') = sign e
-        h' = h <> signm s
-sign (Bihom s x y) | us <- inv szer `mt` s', posT us = (Szer, bihom s' x' y')
-                   | posT s'                         = (Spos, bihom s' x' y')
-                   | us <- inv sinf `mt` s', posT us = (Sinf, bihom s' x' y')
-                   | us <- inv sneg `mt` s', posT us = (Sneg, bihom s' x' y')
-                   | otherwise                       = sign (pump (bihom s' x' y'))
+sign (Quot v) | Just (s, e') <- topsign v = (s, Quot e')
+              | otherwise                 = error "impossible"
+sign (Hom h e) | Just (s, h'') <- topsign h' = (s, hom h'' e)
+               | otherwise                  = sign (pump (hom h' ec))
+  where (sc, ec) = sign e
+        h' = h <> signm sc
+sign (Bihom t x y) | Just (s, t'') <- topsign t' = (s, bihom t'' x' y')
+                   | otherwise                   = sign (pump (bihom t' x' y'))
   where (sx, x') = sign x
         (sy, y') = sign y
-        s' = tm2 (tm1 s (signm sx)) (signm sy)
-sign (Quad q e) | uq <- inv szer `mq` q', posQ uq = (Szer, quad uq e')
-                | posQ q'                         = (Spos, quad q' e')
-                | uq <- inv sinf `mq` q', posQ uq = (Sinf, quad uq e')
-                | uq <- inv sneg `mq` q', posQ uq = (Sneg, quad uq e')
-                | otherwise                     = sign (pump (quad q' e'))
+        t' = tm2 (tm1 t (signm sx)) (signm sy)
+sign (Quad q e) | Just (s, q'') <- topsign q' = (s, quad q'' e)
+                | otherwise                   = sign (pump (quad q' e'))
   where (s, e') = sign e
         q' = q `qm` signm s
 sign (Hurwitz n m) = (Spos, Hurwitz n m)
@@ -1153,13 +1212,7 @@ sign (Mero n t e) = (Spos, Mero n t e)
 
 emitT :: T Z -> Maybe (Info, T Z)
 emitT t@(T a b c d e f g h)
-  | e /= 0, f /= 0, g /= 0, h /= 0,
-    q <- a `quot` e,
-    q /= 0,
-    q == b `quot` f,
-    q == c `quot` g,
-    q == d `quot` h
-  = Just (CFDigit q, inv (cfdigit q) `mt` t)
+  | Just (q, t') <- quotient t = undefined
   | t' <- inv dpos `mt` t, posT t' = Just (BinaryDigit Dpos, t')
   | t' <- inv dneg `mt` t, posT t' = Just (BinaryDigit Dneg, t')
   | t' <- inv dzer `mt` t, posT t' = Just (BinaryDigit Dzer, t')
@@ -1167,35 +1220,17 @@ emitT t@(T a b c d e f g h)
 
 emit :: E -> (Info, E)
 emit (Quot v) = (Term v, error "emit after Term")
-emit (Hom h@(M a b c d) e)
-  | c /= 0, d /= 0,
-    q <- a `quot` c,
-    q /= 0,
-    q == b `quot` d
-  = (CFDigit q, hom (inv (cfdigit q) <> h) e)
-  | h' <- inv dpos <> h, posM h' = (BinaryDigit Dpos, hom h' e)
-  | h' <- inv dneg <> h, posM h' = (BinaryDigit Dneg, hom h' e)
-  | h' <- inv dzer <> h, posM h' = (BinaryDigit Dzer, hom h' e)
-emit (Hom h e) = emit $ pump (hom h e)
-emit (Bihom t x y) = case emitT t of
-  Just (i, t') -> (i, bihom t' x y)
-  Nothing      -> emit $ pump (bihom t x y)
-emit (Quad r@(Q a b c d e f) x)
-  | d /= 0, e /= 0, f /= 0,
-    q <- a `quot` d,
-    q /= 0,
-    q == b `quot` e,
-    q == c `quot` f
-  = (CFDigit q, quad (inv (cfdigit q) `mq` r) x)
-  | r' <- inv dpos `mq` r, posQ r' = (BinaryDigit Dpos, quad r' x)
-  | r' <- inv dneg `mq` r, posQ r' = (BinaryDigit Dneg, quad r' x)
-  | r' <- inv dzer `mq` r, posQ r' = (BinaryDigit Dzer, quad r' x)
-emit (Quad r x) = emit $ pump (quad r x)
+emit (Hom h e)     | Just (i, h') <- topinfo h = (i, hom h' e)
+emit (Hom h e)     | otherwise = emit $ pump (hom h e)
+emit (Bihom t x y) | Just (i, t') <- topinfo t = (i, bihom t' x y)
+emit (Bihom t x y) | otherwise = emit $ pump (bihom t x y)
+emit (Quad r e)    | Just (i, r') <- topinfo r = (i, quad r' e)
+emit (Quad r e)    | otherwise = emit $ pump (quad r e)
 emit (Hurwitz n m) = (AnyHom $ fmap (at n) m, Hurwitz (n+1) m)
-emit (Mero n t e) = case emitT $ fmap (at n) t of
-  Just (i, _) -> let im = fmap lift $ infom i in
-                 (i, mero (inv im `mt` t `tm2` im) e)
-  Nothing     -> emit $ pump (Mero n t e)
+emit (Mero n t e)  | Just (i, _) <- topinfo (fmap (at n) t)
+  = let im = fmap lift $ infom i in
+    (i, mero (inv im `mt` t `tm2` im) e)
+emit (Mero n t e)  | otherwise = emit $ pump (Mero n t e)
 
 pump :: E -> E
 pump (Quot _) = error "pump Quot"
