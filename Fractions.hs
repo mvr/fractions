@@ -1130,7 +1130,7 @@ class Emissive a where
   (#>) :: M Z -> a -> a
 
   contractive :: a -> Bool
-  quotient    :: a -> Maybe (Z, a)
+  quotient    :: a -> Maybe Z
 
 instance Emissive (V Z) where
   (#>) = mv
@@ -1139,37 +1139,37 @@ instance Emissive (V Z) where
 instance Emissive (M Z) where
   (#>) = (<>)
   contractive = posM
-  quotient h@(M a b c d)
+  quotient (M a b c d)
     | c /= 0, d /= 0,
       q <- a `quot` c,
       q /= 0,
       q == b `quot` d
-    = Just (q, inv (cfdigit q) <> h)
+    = Just q
     | otherwise = Nothing
 
 instance Emissive (T Z) where
   (#>) = mt
   contractive = posT
-  quotient t@(T a b c d e f g h)
+  quotient (T a b c d e f g h)
     | e /= 0, f /= 0, g /= 0, h /= 0,
       q <- a `quot` e,
       q /= 0,
       q == b `quot` f,
       q == c `quot` g,
       q == d `quot` h
-    = Just (q, inv (cfdigit q) `mt` t)
+    = Just q
     | otherwise = Nothing
 
 instance Emissive (Q Z) where
   (#>) = mq
   contractive = posQ
-  quotient r@(Q a b c d e f)
+  quotient (Q a b c d e f)
     | d /= 0, e /= 0, f /= 0,
       q <- a `quot` d,
       q /= 0,
       q == b `quot` e,
       q == c `quot` f
-    = Just (q, inv (cfdigit q) `mq` r)
+    = Just q
     | otherwise = Nothing
 
 attempt :: (Emissive a) => M Z -> a -> Maybe a
@@ -1184,7 +1184,7 @@ topsign e | Just e' <- attempt sneg e = Just (Sneg, e')
 topsign _ | otherwise = Nothing
 
 topinfo :: (Emissive a) => a -> Maybe (Info, a)
-topinfo e | Just (q, e') <- quotient e     = Just (CFDigit q, e')
+topinfo e | Just q       <- quotient e     = Just (CFDigit q, inv (cfdigit q) #> e)
 topinfo e | Just e'      <- attempt dpos e = Just (BinaryDigit Dpos, e')
 topinfo e | Just e'      <- attempt dneg e = Just (BinaryDigit Dneg, e')
 topinfo e | Just e'      <- attempt dzer e = Just (BinaryDigit Dzer, e')
@@ -1209,14 +1209,6 @@ sign (Quad q e) | Just (s, q'') <- topsign q' = (s, quad q'' e)
         q' = q `qm` signm s
 sign (Hurwitz n m) = (Spos, Hurwitz n m)
 sign (Mero n t e) = (Spos, Mero n t e)
-
-emitT :: T Z -> Maybe (Info, T Z)
-emitT t@(T a b c d e f g h)
-  | Just (q, t') <- quotient t = undefined
-  | t' <- inv dpos `mt` t, posT t' = Just (BinaryDigit Dpos, t')
-  | t' <- inv dneg `mt` t, posT t' = Just (BinaryDigit Dneg, t')
-  | t' <- inv dzer `mt` t, posT t' = Just (BinaryDigit Dzer, t')
-  | otherwise                      = Nothing
 
 emit :: E -> (Info, E)
 emit (Quot v) = (Term v, error "emit after Term")
