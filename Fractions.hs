@@ -1057,11 +1057,9 @@ instance Fractional E where
 
 instance Floating E where
   pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
-  exp x  = case sign x of
-    (Szer, x') -> mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
-                          (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) x'
-    (s,    x') -> let x'' = signm s `hom` x' in
-                  square $ exp (x'' / 2)
+  -- TODO: Range reduce
+  exp x  = mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
+                   (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) ((inv szer) `hom` x)
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
   sinh x = quad (Q 1 0 (-1) 0 2 0) (exp x)
