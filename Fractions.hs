@@ -1239,11 +1239,11 @@ pump (Quad q x) | (i, e') <- emit x = case i of
                   _      -> quad (q `qm` infom i) e'
 pump (Hurwitz _ _) = error "pump Hurwitz"
 -- TODO: need to use a 'strategy' here too
-pump (Mero n t e) = popMero kerchunked
+pump (Mero n t e) = kerchunked
   where (i, e') = emit e
         kerchunked = case i of
           Term v -> Hurwitz n (t `tv1` fmap lift v)
-          _      -> Mero n (t `tm1` fmap lift (infom i)) e'
+          _      -> popMero $ Mero n (t `tm1` fmap lift (infom i)) e'
         popMero (Mero n t e) = bihom (fmap (at n) t) e (Mero (n+1) t e)
 
 data Result = Result SignM [Info] deriving (Show)
