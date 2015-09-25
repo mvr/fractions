@@ -1226,6 +1226,7 @@ sign (Mero n t e) = (Spos, Mero n t e)
 
 emit :: E -> (Info, E)
 emit (Quot v) = (Term v, error "emit after Term")
+emit (Hom h e)     | pos h = (AnyHom h, e)
 emit (Hom h e)     | Just (i, h') <- topinfo h = (i, hom h' e)
 emit (Hom h e)     | otherwise = emit $ pump (hom h e)
 emit (Bihom t x y) | Just (i, t') <- topinfo t = (i, bihom t' x y)
