@@ -330,24 +330,58 @@ class Columns f where
 instance Columns V where
   columns f v = f v
 
-sigma :: V Z -> Z
-sigma (V a b) = case compare a 0 of
-  LT | b <= 0 -> -1
-     | otherwise -> 0
-  GT | b >= 0 -> 1
-     | otherwise -> 0
-  _           -> signum b
+--------------------------------------------------------------------------------
+-- * Interactivity
+--------------------------------------------------------------------------------
 
--- | Is V ∈ V⁺ ?
---
--- @
--- posV v = sigma v /= 0
--- @
-posV :: V Z -> Bool
-posV (V a b) = case compare a 0 of
-  LT -> b <= 0
-  EQ -> b /= 0
-  GT -> b >= 0
+data SigmaS = SigmaN | SigmaZ | SigmaP | SigmaI deriving (Eq)
+
+instance Semigroup SigmaS where
+  SigmaP <> SigmaP = SigmaP
+  SigmaN <> SigmaN = SigmaN
+  SigmaZ <> x = x
+  x <> SigmaZ = x
+  SigmaN <> SigmaP = SigmaI
+  SigmaP <> SigmaN = SigmaI
+  SigmaI <> _      = SigmaI
+  _      <> SigmaI = SigmaI
+
+class Sigma a where
+  sigma :: a -> SigmaS
+
+  default sigma :: (Columns f) => f a -> SigmaS
+  sigma v = columns sigma v
+
+instance Sigma Z where
+  sigma n = case signum n of
+    -1 -> SigmaN
+    0  -> SigmaZ
+    1  -> SigmaP
+
+instance Sigma (P Z) where
+  sigma (P as) | all (== 0) as = SigmaZ
+               | all (>= 0) as = SigmaP
+               | all (<= 0) as = SigmaN
+               | otherwise     = SigmaI
+
+instance Sigma a => Sigma (V a) where
+  sigma (V a b) = case sigma a of
+    SigmaI -> SigmaI
+    SigmaN | sigma b == SigmaN -> SigmaN
+           | sigma b == SigmaZ -> SigmaN
+           | otherwise         -> SigmaI
+    SigmaP | sigma b == SigmaP -> SigmaP
+           | sigma b == SigmaZ -> SigmaP
+           | otherwise         -> SigmaI
+    SigmaZ                    -> sigma b
+
+instance (Sigma a) => Sigma (M a)
+instance (Sigma a) => Sigma (Q a)
+instance (Sigma a) => Sigma (T a)
+
+pos :: Sigma a => a -> Bool
+pos a = let s = sigma a in
+  s == SigmaN || s == SigmaP
 
 --------------------------------------------------------------------------------
 -- * r((1+√5)/2) = r(√5)
@@ -564,10 +598,6 @@ mv (M a b c d) (V e f) = V (a*e+b*f) (c*e+d*f)
 -- | Transpose a matrix
 transposeM :: M a -> M a
 transposeM (M a b c d) = M a c b d
-
--- | is m ∈ M⁺ ?
-posM :: M Z -> Bool
-posM (M a b c d) = sigma (V a c) * sigma (V b d) == 1
 
 class Informed f where
   -- # of digit matrices we can emit
@@ -843,11 +873,6 @@ approx (T a b c d e f g h)
   , V n p <- max j l
   = M m n o p
 
--- | is e ∈ T⁺ ?
-posT :: T Z -> Bool
-posT t@(T a _ _ _ e _ _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) t)
-  where first = sigma (V a e)
-
 --------------------------------------------------------------------------------
 -- * Binary Quadratic Forms?
 --------------------------------------------------------------------------------
@@ -938,11 +963,6 @@ mq :: Num a => M a -> Q a -> Q a
 mq (M a b c d) (Q e f g h i j) = Q
   (a*e+b*h) (a*f+b*i) (a*g+b*j)
   (c*e+d*h) (c*f+d*i) (c*g+d*j)
-
--- | is q ∈ Q⁺ ?
-posQ :: Q Z -> Bool
-posQ q@(Q a _ _ d _ _) = first /= 0 && getAll (columns (\v -> All $ sigma v == first) q)
-  where first = sigma (V a d)
 
 --------------------------------------------------------------------------------
 -- * Exact Real Arithmetic
@@ -1123,20 +1143,18 @@ infom (CFDigit q) = cfdigit q
 infom (BinaryDigit b) = digitm b
 infom (AnyHom h) = h
 
-class Emissive a where
+class Sigma a => Emissive a where
   -- Precompose an (M Z)
   (#>) :: M Z -> a -> a
 
-  contractive :: a -> Bool
   quotient    :: a -> Maybe Z
 
 instance Emissive (V Z) where
   (#>) = mv
-  contractive = posV
+  quotient _ = Nothing
 
 instance Emissive (M Z) where
   (#>) = (<>)
-  contractive = posM
   quotient (M a b c d)
     | c /= 0, d /= 0,
       q <- a `quot` c,
@@ -1147,7 +1165,6 @@ instance Emissive (M Z) where
 
 instance Emissive (T Z) where
   (#>) = mt
-  contractive = posT
   quotient (T a b c d e f g h)
     | e /= 0, f /= 0, g /= 0, h /= 0,
       q <- a `quot` e,
@@ -1160,7 +1177,6 @@ instance Emissive (T Z) where
 
 instance Emissive (Q Z) where
   (#>) = mq
-  contractive = posQ
   quotient (Q a b c d e f)
     | d /= 0, e /= 0, f /= 0,
       q <- a `quot` d,
@@ -1172,7 +1188,7 @@ instance Emissive (Q Z) where
 
 attempt :: (Emissive a) => M Z -> a -> Maybe a
 attempt m e = let e' = inv m #> e in
-              if contractive e' then Just e' else Nothing
+              if pos e' then Just e' else Nothing
 
 topsign :: (Emissive a) => a -> Maybe (SignM, a)
 topsign e | Just e' <- attempt szer e = Just (Szer, e')
