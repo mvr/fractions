@@ -1175,6 +1175,10 @@ instance Emissive (T Z) where
     = Just q
     | otherwise = Nothing
 
+instance Emissive (T (P Z)) where
+  m #> t = fmap lift m `mt` t
+  quotient _ = Nothing
+
 instance Emissive (Q Z) where
   (#>) = mq
   quotient (Q a b c d e f)
@@ -1234,7 +1238,7 @@ emit (Bihom t x y) | otherwise = emit $ pump (bihom t x y)
 emit (Quad r e)    | Just (i, r') <- topinfo r = (i, quad r' e)
 emit (Quad r e)    | otherwise = emit $ pump (quad r e)
 emit (Hurwitz n m) = (AnyHom $ fmap (at n) m, Hurwitz (n+1) m)
-emit (Mero n t e)  | Just (i, _) <- topinfo (fmap (at n) t)
+emit (Mero n t e)  | Just (i, _) <- topinfo t
   = let im = fmap lift $ infom i in
     (i, Mero n (scaleP $ inv im `mt` t `tm2` im) e)
 emit (Mero n t e)  | otherwise = emit $ pump (Mero n t e)
