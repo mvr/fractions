@@ -331,7 +331,7 @@ instance Columns V where
   columns f v = f v
 
 --------------------------------------------------------------------------------
--- * Interactivity
+-- * Contractivity
 --------------------------------------------------------------------------------
 
 data SigmaS = SigmaN | SigmaZ | SigmaP | SigmaI deriving (Eq)
