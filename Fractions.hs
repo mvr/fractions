@@ -353,10 +353,10 @@ class Sigma a where
   sigma v = columns sigma v
 
 instance Sigma Z where
-  sigma n = case signum n of
-    -1 -> SigmaN
-    0  -> SigmaZ
-    1  -> SigmaP
+  sigma n = case compare n 0 of
+    LT -> SigmaN
+    EQ -> SigmaZ
+    GT -> SigmaP
 
 instance Sigma (P Z) where
   sigma (P as) | all (== 0) as = SigmaZ
@@ -1142,6 +1142,7 @@ infom :: Info -> M Z
 infom (CFDigit q) = cfdigit q
 infom (BinaryDigit b) = digitm b
 infom (AnyHom h) = h
+infom (Term (V n d)) = M n n d d
 
 class Sigma a => Emissive a where
   -- Precompose an (M Z)
@@ -1223,8 +1224,8 @@ sign (Bihom t x y) | Just (s, t'') <- topsign t' = (s, bihom t'' x' y')
         t' = tm2 (tm1 t (signm sx)) (signm sy)
 sign (Quad q e) | Just (s, q'') <- topsign q' = (s, quad q'' e)
                 | otherwise                   = sign (pump (quad q' e'))
-  where (s, e') = sign e
-        q' = q `qm` signm s
+  where (se, e') = sign e
+        q' = q `qm` signm se
 sign (Hurwitz n m) = (Spos, Hurwitz n m)
 sign (Mero n t e) = (Spos, Mero n t e)
 
@@ -1264,21 +1265,24 @@ pump (Mero n t e) = kerchunked
   where (i, e') = emit e
         kerchunked = case i of
           Term v -> Hurwitz n (t `tv1` fmap lift v)
-          _      -> popMero $ Mero n (t `tm1` fmap lift (infom i)) e'
-        popMero (Mero n t e) = bihom (fmap (at n) t) e (Mero (n+1) t e)
+          _      -> popMero n (t `tm1` fmap lift (infom i)) e'
+
+popMero :: Z -> T (P Z) -> E -> E
+popMero n t e = bihom (fmap (at n) t) e (Mero (n+1) t e)
 
 data Result = Result SignM [Info] deriving (Show)
 
 result :: E -> Result
 result e = Result s (results ue)
   where (s, ue) = sign e
-        results e = case emit e of
+        results e' = case emit e' of
           (Term v, _) -> [Term v]
           (i, next) -> i : results next
 
 approximate :: Integer -> Result -> V Z
-approximate n (Result sign is) = signm sign `mv` unsigned n is
-  where unsigned _ [Term v] = v
+approximate n (Result s is) = signm s `mv` unsigned n is
+  where unsigned _ [] = V 0 0
+        unsigned _ [Term v] = v
         unsigned 0 (i:is) | M a _ c _ <- infom i = V a c -- why not
         unsigned n (i:is) = infom i `mv` unsigned (n-1) is
 
