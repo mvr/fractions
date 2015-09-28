@@ -1107,10 +1107,6 @@ gcfdigit a b = M a b 1 0
 -- * Redundant Binary Representation
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
--- * Information Extraction
---------------------------------------------------------------------------------
-
 data SignM = Sinf | Sneg | Szer | Spos deriving (Show)
 
 signm :: Num a => SignM -> M a
@@ -1134,6 +1130,10 @@ digitm :: Num a => DigitM -> M a
 digitm Dneg = dneg
 digitm Dzer = dzer
 digitm Dpos = dpos
+
+--------------------------------------------------------------------------------
+-- * Information Extraction
+--------------------------------------------------------------------------------
 
 data Info = CFDigit Z | BinaryDigit DigitM | AnyHom (M Z) | Term (V Z)
   deriving (Show)
