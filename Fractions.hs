@@ -868,7 +868,7 @@ transposeT (T a b c d e f g h) = T a c b d e g f h
 approx :: (IntegralDomain a, Ord a) => T a -> M a
 approx (T a b c d e f g h)
   | (i,j) <- minmax (V a e) (V b f)
-  , (k,l) <- minmax (V c g) (V g h)
+  , (k,l) <- minmax (V c g) (V d h)
   , V m o <- min i k
   , V n p <- max j l
   = M m n o p
