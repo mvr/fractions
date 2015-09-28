@@ -147,7 +147,7 @@ instance (IntegralDomain a, Ord a) => Ord (V a) where
   min u@(V a b) v@(V c d)
     | b * d == 0 = V (hard a b c d) 0
     | a*d <= b*c = u
-    | a*d <= b*c = v
+    | otherwise  = v
     where -- min ∞ ∞ = ∞, min ∞ a = ⊥, min ∞ b = ⊥
       hard 0 0 _ _ = 0
       hard _ _ 0 0 = 0
@@ -157,7 +157,7 @@ instance (IntegralDomain a, Ord a) => Ord (V a) where
   max u@(V a b) v@(V c d)
     | b * d == 0 = V (hard a b c d) 0
     | a*d <= b*c = v
-    | a*d <= b*c = u
+    | otherwise  = u
     where -- max ∞ ∞ = ∞, max ∞ a = ⊥, max ∞ b = ⊥
       hard 0 0 _ _ = 0
       hard _ _ 0 0 = 0
@@ -169,7 +169,7 @@ minmax :: (IntegralDomain a, Ord a) => V a -> V a -> (V a, V a)
 minmax u@(V a b) v@(V c d)
   | b * d == 0, w <- V (hard a b c d) 0 = (w,w)
   | a*d <= b*c = (u,v)
-  | a*d <= b*c = (v,u)
+  | otherwise  = (v,u)
   where -- max ∞ ∞ = ∞, max ∞ a = ⊥, max ∞ b = ⊥
     hard 0 0 _ _ = 0
     hard _ _ 0 0 = 0
