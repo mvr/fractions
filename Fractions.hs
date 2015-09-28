@@ -339,8 +339,8 @@ data SigmaS = SigmaN | SigmaZ | SigmaP | SigmaI deriving (Eq)
 instance Semigroup SigmaS where
   SigmaP <> SigmaP = SigmaP
   SigmaN <> SigmaN = SigmaN
-  SigmaZ <> x = x
-  x <> SigmaZ = x
+  SigmaZ <> x      = x
+  x      <> SigmaZ = x
   SigmaN <> SigmaP = SigmaI
   SigmaP <> SigmaN = SigmaI
   SigmaI <> _      = SigmaI
