@@ -1260,26 +1260,20 @@ pump (Quot _) = error "pump Quot"
 pump (Hom h e) | (i, e') <- emit e = case i of
                  Term v -> hom h (Quot v)
                  _      -> hom (h <> infom i) e'
--- TODO: need to use a 'strategy' here
-pump (Bihom t x y) | (ix, x') <- emit x,
-                     (iy, y') <- emit y
-                   = case (ix, iy) of
-                     (Term v, _) -> bihom t (Quot v) y
-                     (_, Term v) -> bihom t x (Quot v)
-                     (_, _) -> bihom (t `tm1` infom ix `tm2` infom iy ) x' y'
+pump (Bihom t x y) | strategy t = case emit x of
+                     (Term v, _)  -> bihom t (Quot v) y
+                     (i,      x') -> bihom (t `tm1` infom i) x' y
+pump (Bihom t x y) | otherwise  = case emit y of
+                     (Term v, _)  -> bihom t x (Quot v)
+                     (i,      y') -> bihom (t `tm2` infom i) x  y'
 pump (Quad q x) | (i, e') <- emit x = case i of
                   Term v -> quad q (Quot v)
                   _      -> quad (q `qm` infom i) e'
 pump (Hurwitz _ _) = error "pump Hurwitz"
--- TODO: need to use a 'strategy' here too
-pump (Mero n t e) = kerchunked
-  where (i, e') = emit e
-        kerchunked = case i of
-          Term v -> Hurwitz n (t `tv1` fmap lift v)
-          _      -> popMero n (t `tm1` fmap lift (infom i)) e'
-
-popMero :: Z -> T (P Z) -> E -> E
-popMero n t e = bihom (fmap (at n) t) e (Mero (n+1) t e)
+pump (Mero n t e) | strategy $ fmap (at n) t = case emit e of
+                    (Term v, _)  -> Hurwitz n (t `tv1` fmap lift v)
+                    (i,      e') -> Mero n (t `tm1` fmap lift (infom i)) e'
+pump (Mero n t e) | otherwise = bihom (fmap (at n) t) e (Mero (n+1) t e)
 
 data Result = Result SignM [Info] deriving (Show)
 
