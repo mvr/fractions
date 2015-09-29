@@ -1091,11 +1091,32 @@ instance Floating E where
   -- TODO: Range reduce
   exp x  = mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
                    (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) ((inv szer) `hom` x)
+  -- TODO: Range reduce
+  log x  = bihom (T 1 1 (-1) (-1) 0 1 1 0) x $
+           mero (T (P [1,1]) (P [3,2]) (P [2,1]) (P [])
+                   (P [])    (P [2,1]) (P [3,2]) (P [1,1])) x
+  -- TODO: Range reduce
+  tan x  = bihom (T 1 1 (-1) (-1) 2 0 0 2) x' $
+           mero (T (P [3,2]) (P [1,2]) (P [3,2]) (P [5,2])
+                   (P [5,2]) (P [3,2]) (P [1,2]) (P [3,2])) x'
+    where x' = inv szer `hom` x
+  -- TODO: Range reduce
+  atan x = bihom (T 1 1 (-1) (-1) 2 0 0 2) x' $
+           mero (T (P [3,2]) (P [1,1]) (P [])    (P [2,1])
+                   (P [2,1]) (P [])    (P [1,1]) (P [3,2])) x'
+    where x' = inv szer `hom` x
+  sqrt x = mero (T 1 2 1 0 0 1 2 1) x
+
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
   cos x  = quad (Q (-1) 0 1 1 0 1) (tan (x/2))
   sinh x = quad (Q 1 0 (-1) 0 2 0) (exp x)
   cosh x = quad (Q 1 0 1 0 2 0)    (exp x)
   tanh x = quad (Q 1 0 (-1) 1 0 1) (exp x)
+  asin x = atan $ sqrt $ quad (Q 1 0 0 (-1) 0 1) x
+  acos x = atan $ sqrt $ quad (Q (-1) 0 1 1 0 0) x
+  asinh x = log $ x + sqrt (x^2 + 1)
+  acosh x = log $ x + sqrt (x^2 - 1)
+  atanh x = log (hom sinf x) / 2
 
 instance IntegralDomain E
 
