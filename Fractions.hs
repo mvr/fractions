@@ -864,6 +864,9 @@ tq (T a b c d e f g h) = Q a (b+c) d e (f+g) h
 transposeT :: T a -> T a
 transposeT (T a b c d e f g h) = T a c b d e g f h
 
+componentsT :: T a -> (M a, M a)
+componentsT (T a b c d e f g h) = (M a b e f, M c d g h)
+
 -- | best naive homographic approximation
 approx :: (IntegralDomain a, Ord a) => T a -> M a
 approx (T a b c d e f g h)
@@ -872,6 +875,14 @@ approx (T a b c d e f g h)
   , V m o <- min i k
   , V n p <- max j l
   = M m n o p
+
+-- True -> X, False -> Y
+strategy :: (IntegralDomain a, Ord a) => T a -> Bool
+strategy t = overlap
+  where (c0, c1) = componentsT $ transposeT t
+        (tt0i, tt0s) = bounds c0
+        (tt1i, tt1s) = bounds c1
+        overlap = not (tt0s < tt1i || tt1s < tt0i)
 
 --------------------------------------------------------------------------------
 -- * Binary Quadratic Forms?
