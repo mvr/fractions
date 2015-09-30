@@ -1041,20 +1041,6 @@ hurwitz :: M (P Z) -> E
 -- hurwitz (fmap at0 -> M a b c d) | a*d == c*b = Quot (V a c) -- singular: TODO: check this
 hurwitz m = Hurwitz 0 (scaleP m)
 
--- -- extract a partial quotient
--- nextF :: F -> Maybe (Z, F)
--- nextF (Quot (V k n)) = case quotRem k n of
---   (q, r) -> Just (q, Quot (V n r))
--- nextF (Hom (M a b 0 0) xs) = Nothing -- ∞ or ⊥
--- nextF (Hom m@(M a b c d) xs)
---   | c /= 0, d /= 0
---   , signum c * signum (c + d) > 0 -- knuth style warmup?
---   , q <- quot a c
---   , q == quot b d
---   , n <- cfdigit q = Just (q, Hom (inv n <> m) xs)
--- nextF (Hom m xs) = nextF (hom m xs) -- fetch more
--- nextF (Hurwitz m) = nextF (Hom (fmap at0 m) $ Hurwitz (fmap (<> P [1,1]) m)) -- explicitly used Hom to keep it from merging back
-
 square :: E -> E
 square x = quad (Q 1 0 0 0 0 1) x
 
