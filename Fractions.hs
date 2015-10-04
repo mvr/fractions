@@ -1074,23 +1074,32 @@ instance Fractional E where
 
 instance Floating E where
   pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
-  -- TODO: Range reduce
+
+  exp x | possibly intervalLT x (-1) || possibly intervalGT x 1
+         = square $ exp (x / 2)
   exp x  = mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
                    (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) ((inv szer) `hom` x)
-  -- TODO: Range reduce
+
+  log x | possibly intervalLT x (1/2) || possibly intervalGT x 2
+         = log (x / 2) + log 2
   log x  = bihom (T 1 1 (-1) (-1) 0 1 1 0) x $
            mero (T (P [1,1]) (P [3,2]) (P [2,1]) (P [])
                    (P [])    (P [2,1]) (P [3,2]) (P [1,1])) x
-  -- TODO: Range reduce
+  tan x | possibly intervalLT x (-1) || possibly intervalGT x 1
+         = quad (Q 0 2 0 (-1) 0 1) (tan $ x / 2)
   tan x  = bihom (T 1 1 (-1) (-1) 2 0 0 2) x' $
            mero (T (P [3,2]) (P [1,2]) (P [3,2]) (P [5,2])
                    (P [5,2]) (P [3,2]) (P [1,2]) (P [3,2])) x'
     where x' = inv szer `hom` x
-  -- TODO: Range reduce
-  atan x = bihom (T 1 1 (-1) (-1) 2 0 0 2) x' $
-           mero (T (P [3,2]) (P [1,1]) (P [])    (P [2,1])
-                   (P [2,1]) (P [])    (P [1,1]) (P [3,2])) x'
-    where x' = inv szer `hom` x
+  atan x = case sign x of
+             (Szer, x') -> atanszer x'
+             (Spos, x') -> (pi/4)   + atanszer x'
+             (Sinf, x') -> (pi/2)   + atanszer x'
+             (Sneg, x') -> (3*pi/4) + atanszer x'
+    where atanszer x = bihom (T 1 1 (-1) (-1) 2 0 0 2) x $
+                       mero (T (P [3,2]) (P [1,1]) (P [])    (P [2,1])
+                               (P [2,1]) (P [])    (P [1,1]) (P [3,2])) x
+
   sqrt x = mero (T 1 2 1 0 0 1 2 1) x
 
   sin x  = quad (Q 0 2 0 1 0 1)    (tan (x/2))
@@ -1290,6 +1299,23 @@ result e = Result s (results ue)
         results e' = case emit e' of
           (Term v, _) -> [Term v]
           (i, next) -> i : results next
+
+resultants :: E -> [(V Z, V Z)]
+resultants e | (Result s rs) <- result e = fmap bounds $ scanl (<>) (signm s) $ fmap infom rs
+
+intervalLT :: (V Z, V Z) -> (V Z, V Z) -> Bool
+intervalLT (i1, s1) (i2, s2) = s1 < i2
+
+intervalGT :: (V Z, V Z) -> (V Z, V Z) -> Bool
+intervalGT (i1, s1) (i2, s2) = s2 < i1
+
+possibly :: ((V Z, V Z) -> (V Z, V Z) -> Bool) -> E -> E -> Bool
+possibly f x y = go 100 (resultants x) (resultants y)
+  where go 0 _  _      = True
+        go _ [x'] [y'] = f x' y'
+        go n (x':xs) [y'] = if f x' y' then True else go (n-1) xs [y']
+        go n [x'] (y':ys) = if f x' y' then True else go (n-1) [x'] ys
+        go n (x':xs) (y':ys) = if f x' y' then True else go (n-1) xs ys
 
 approximate :: Integer -> Result -> V Z
 approximate n (Result s is) = signm s `mv` unsigned n is
