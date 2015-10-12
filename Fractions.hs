@@ -349,9 +349,6 @@ instance Semigroup SigmaS where
 class Sigma a where
   sigma :: a -> SigmaS
 
-  default sigma :: (Columns f) => f a -> SigmaS
-  sigma v = columns sigma v
-
 instance Sigma Z where
   sigma n = case compare n 0 of
     LT -> SigmaN
@@ -365,19 +362,16 @@ instance Sigma (P Z) where
                | otherwise     = SigmaI
 
 instance Sigma a => Sigma (V a) where
-  sigma (V a b) = case sigma a of
-    SigmaI -> SigmaI
-    SigmaN | sigma b == SigmaN -> SigmaN
-           | sigma b == SigmaZ -> SigmaN
-           | otherwise         -> SigmaI
-    SigmaP | sigma b == SigmaP -> SigmaP
-           | sigma b == SigmaZ -> SigmaP
-           | otherwise         -> SigmaI
-    SigmaZ                    -> sigma b
+  sigma (V a b) = sigma a <> sigma b
 
-instance (Sigma a) => Sigma (M a)
-instance (Sigma a) => Sigma (Q a)
-instance (Sigma a) => Sigma (T a)
+instance (Sigma a) => Sigma (M a) where
+  sigma m = columns sigma m
+
+instance (Sigma a) => Sigma (Q a) where
+  sigma q = columns sigma q
+
+instance (Sigma a) => Sigma (T a) where
+  sigma t = columns sigma t
 
 pos :: Sigma a => a -> Bool
 pos a = let s = sigma a in
