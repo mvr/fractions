@@ -1030,7 +1030,7 @@ quad (Q a b c d e f) x
   | a*e == b*d, a*f == d*c, b*f == c*e, False = undefined
   -- TODO: we can factor our quadratic form into @Q (p*r) (p*s) (p*t) (q*r) (q*s) (q*t)@
   -- do something with that fact
-quad q x = Quad q x
+quad q x = Quad (scale q) x
 
 -- smart constructor
 hurwitz :: M (P Z) -> E
