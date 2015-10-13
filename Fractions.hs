@@ -1182,7 +1182,7 @@ instance Emissive (M Z) where
   quotient (M a b c d)
     | c /= 0, d /= 0,
       q <- a `quot` c,
-      q /= 0,
+      q > 0,
       q == b `quot` d
     = Just q
     | otherwise = Nothing
@@ -1192,7 +1192,7 @@ instance Emissive (T Z) where
   quotient (T a b c d e f g h)
     | e /= 0, f /= 0, g /= 0, h /= 0,
       q <- a `quot` e,
-      q /= 0,
+      q > 0,
       q == b `quot` f,
       q == c `quot` g,
       q == d `quot` h
@@ -1208,7 +1208,7 @@ instance Emissive (Q Z) where
   quotient (Q a b c d e f)
     | d /= 0, e /= 0, f /= 0,
       q <- a `quot` d,
-      q /= 0,
+      q > 0,
       q == b `quot` e,
       q == c `quot` f
     = Just q
