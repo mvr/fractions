@@ -139,31 +139,34 @@ instance (IntegralDomain a, Eq a) => Eq (V a) where
 instance (IntegralDomain a, Ord a) => Ord (V a) where
   compare (V a b) (V c d)
     | b * d == 0 = GT -- undefined
-    | otherwise = compare (a * d) (b * c)
-  V a b <= V c d = b * d /= 0 && a*d <= b*c
-  V a b <  V c d = b * d /= 0 && a*d <  b*c
-  V a b >  V c d = b * d /= 0 && a*d >  b*c
-  V a b >= V c d = b * d /= 0 && a*d >= b*c
-  min u@(V a b) v@(V c d)
-    | b * d == 0 = V (hard a b c d) 0
-    | a*d <= b*c = u
-    | otherwise  = v
-    where -- min ∞ ∞ = ∞, min ∞ a = ⊥, min ∞ b = ⊥
-      hard 0 0 _ _ = 0
-      hard _ _ 0 0 = 0
-      hard _ 0 _ _ = 0
-      hard _ _ _ 0 = 0
-      hard _ _ _ _ = 1 -- min ∞ ∞ = ∞
-  max u@(V a b) v@(V c d)
-    | b * d == 0 = V (hard a b c d) 0
-    | a*d <= b*c = v
-    | otherwise  = u
-    where -- max ∞ ∞ = ∞, max ∞ a = ⊥, max ∞ b = ⊥
-      hard 0 0 _ _ = 0
-      hard _ _ 0 0 = 0
-      hard _ 0 _ _ = 0
-      hard _ _ _ 0 = 0
-      hard _ _ _ _ = 1 -- max ∞ ∞ = ∞
+    | b >= 0 && d >= 0 = compare (a * d) (b * c)
+    | b <  0 && d <  0 = compare (a * d) (b * c)
+    | otherwise = compare (b * c) (a * d)
+
+  -- V a b <= V c d = b * d /= 0 && a*d <= b*c
+  -- V a b <  V c d = b * d /= 0 && a*d <  b*c
+  -- V a b >  V c d = b * d /= 0 && a*d >  b*c
+  -- V a b >= V c d = b * d /= 0 && a*d >= b*c
+  -- min u@(V a b) v@(V c d)
+  --   | b * d == 0 = V (hard a b c d) 0
+  --   | a*d <= b*c = u
+  --   | otherwise  = v
+  --   where -- min ∞ ∞ = ∞, min ∞ a = ⊥, min ∞ b = ⊥
+  --     hard 0 0 _ _ = 0
+  --     hard _ _ 0 0 = 0
+  --     hard _ 0 _ _ = 0
+  --     hard _ _ _ 0 = 0
+  --     hard _ _ _ _ = 1 -- min ∞ ∞ = ∞
+  -- max u@(V a b) v@(V c d)
+  --   | b * d == 0 = V (hard a b c d) 0
+  --   | a*d <= b*c = v
+  --   | otherwise  = u
+  --   where -- max ∞ ∞ = ∞, max ∞ a = ⊥, max ∞ b = ⊥
+  --     hard 0 0 _ _ = 0
+  --     hard _ _ 0 0 = 0
+  --     hard _ 0 _ _ = 0
+  --     hard _ _ _ 0 = 0
+  --     hard _ _ _ _ = 1 -- max ∞ ∞ = ∞
 
 minmax :: (IntegralDomain a, Ord a) => V a -> V a -> (V a, V a)
 minmax u@(V a b) v@(V c d)
