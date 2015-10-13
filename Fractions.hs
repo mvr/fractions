@@ -1071,17 +1071,17 @@ instance Fractional E where
 instance Floating E where
   pi     = M 0 4 1 0 `Hom` hurwitz (M (P [1,2]) (P [1,2,1]) 1 0)
 
-  exp x | possibly intervalLT x (-1) || possibly intervalGT x 1
+  exp x | possibly LT x (-1) || possibly GT x 1
          = square $ exp (x / 2)
   exp x  = mero (T (P [2,2]) (P [1,2]) (P [0,2]) (P [1,2])
                    (P [1,2]) (P [0,2]) (P [1,2]) (P [2,2])) ((inv szer) `hom` x)
 
-  log x | possibly intervalLT x (1/2) || possibly intervalGT x 2
+  log x | possibly LT x (1/2) || possibly GT x 2
          = log (x / 2) + log 2
   log x  = bihom (T 1 1 (-1) (-1) 0 1 1 0) x $
            mero (T (P [1,1]) (P [3,2]) (P [2,1]) (P [])
                    (P [])    (P [2,1]) (P [3,2]) (P [1,1])) x
-  tan x | possibly intervalLT x (-1) || possibly intervalGT x 1
+  tan x | possibly LT x (-1) || possibly GT x 1
          = quad (Q 0 2 0 (-1) 0 1) (tan $ x / 2)
   tan x  = bihom (T 1 1 (-1) (-1) 2 0 0 2) x' $
            mero (T (P [3,2]) (P [1,2]) (P [3,2]) (P [5,2])
@@ -1299,19 +1299,25 @@ result e = Result s (results ue)
 resultants :: E -> [(V Z, V Z)]
 resultants e | (Result s rs) <- result e = fmap bounds $ scanl (<>) (signm s) $ fmap infom rs
 
-intervalLT :: (V Z, V Z) -> (V Z, V Z) -> Bool
-intervalLT (i1, s1) (i2, s2) = s1 < i2
+intervalOrd :: (V Z, V Z) -> (V Z, V Z) -> Maybe Ordering
+intervalOrd (i1, s1) (i2, s2) | s1 < i2 = Just LT
+                              | s2 < i1 = Just GT
+                              | i1 == s1 && i1 == i2 && i1 == s2 = Just EQ
+                              | otherwise = Nothing
 
-intervalGT :: (V Z, V Z) -> (V Z, V Z) -> Bool
-intervalGT (i1, s1) (i2, s2) = s2 < i1
-
-possibly :: ((V Z, V Z) -> (V Z, V Z) -> Bool) -> E -> E -> Bool
-possibly f x y = go 100 (resultants x) (resultants y)
+possibly :: Ordering -> E -> E -> Bool
+possibly o x y = go 100 (resultants x) (resultants y)
   where go 0 _  _      = True
-        go _ [x'] [y'] = f x' y'
-        go n (x':xs) [y'] = if f x' y' then True else go (n-1) xs [y']
-        go n [x'] (y':ys) = if f x' y' then True else go (n-1) [x'] ys
-        go n (x':xs) (y':ys) = if f x' y' then True else go (n-1) xs ys
+        go _ [x'] [y'] = intervalOrd x' y' == Just o
+        go n (x':xs) [y'] = case intervalOrd x' y' of
+                             Just o' -> o' == o
+                             Nothing -> go (n-1) xs [y']
+        go n [x'] (y':ys) = case intervalOrd x' y' of
+                             Just o' -> o' == o
+                             Nothing -> go (n-1) [x'] ys
+        go n (x':xs) (y':ys) = case intervalOrd x' y' of
+                             Just o' -> o' == o
+                             Nothing -> go (n-1) xs ys
 
 approximate :: Integer -> Result -> V Z
 approximate n (Result s is) = signm s `mv` unsigned n is
