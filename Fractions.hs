@@ -985,7 +985,6 @@ data E
   | Quad    {-# UNPACK #-} !(Q Z) E                           -- quadratic fractional transformation
   | Mero    {-# UNPACK #-} !Integer !(T (P Z)) E              -- nested bihomographic transformations
   | Bihom   {-# UNPACK #-} !(T Z) E E                         -- bihomographic transformation
-    deriving (Show)
 
 hom :: M Z -> E -> E
 hom m (Quot v) = Quot $ scale $ mv m v
@@ -1321,3 +1320,23 @@ approximate n (Result s is) = signm s `mv` unsigned n is
 --------------------------------------------------------------------------------
 -- * Decimal
 --------------------------------------------------------------------------------
+
+positionalDigit :: Z -> Z -> M Z
+positionalDigit b d = M 1 (b*d) 0 b
+
+decimalDigits :: E -> [Z]
+decimalDigits e | (Result s rs) <- result e = go (signm s) (fmap infom rs)
+  where go m (r:rs) = case integer m of
+                        Just q  -> q : go (inv (positionalDigit 10 q) <> m) (r:rs)
+                        Nothing -> go (m <> r) rs
+        integer (M a b c d)
+          | c /= 0, d /= 0,
+            q <- a `quot` c,
+            q == b `quot` d
+          = Just q
+          | otherwise = Nothing
+
+instance Show E where
+  -- TODO: negatives
+  show e = show l ++ "." ++ (concatMap show ds)
+    where l:ds = decimalDigits e
