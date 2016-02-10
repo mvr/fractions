@@ -1141,7 +1141,7 @@ signm Spos = mempty
 data DigitM = Dneg | Dzer | Dpos deriving (Show)
 
 dneg :: Num a => M a
-dneg = M 1 0 2 2
+dneg = M 1 0 1 2
 
 dzer :: Num a => M a
 dzer = M 3 1 1 3
